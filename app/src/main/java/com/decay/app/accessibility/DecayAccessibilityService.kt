@@ -29,7 +29,7 @@ class DecayAccessibilityService : AccessibilityService() {
     override fun onServiceConnected() {
         super.onServiceConnected()
         DecayCore.accessibility = this
-        DecayCore.loadEnabled(this)
+        DecayCore.load(this)
         reevaluate()
     }
 
@@ -81,8 +81,17 @@ class DecayAccessibilityService : AccessibilityService() {
             val stroke = GestureDescription.StrokeDescription(path, 0L, SWIPE_DURATION_MS)
             val gesture = GestureDescription.Builder().addStroke(stroke).build()
 
-            val dispatched = dispatchGesture(gesture, null, null)
-            if (!dispatched) Log.w(TAG, "dispatchGesture returned false")
+            val callback = object : GestureResultCallback() {
+                override fun onCompleted(d: GestureDescription?) {
+                    Log.d(TAG, "swipe completed")
+                }
+
+                override fun onCancelled(d: GestureDescription?) {
+                    Log.w(TAG, "swipe cancelled")
+                }
+            }
+            val dispatched = dispatchGesture(gesture, callback, mainHandler)
+            Log.d(TAG, "dispatchGesture -> $dispatched (${startY.toInt()} to ${endY.toInt()})")
         }
     }
 

@@ -1,6 +1,7 @@
 package com.decay.app.core
 
 import android.content.Context
+import android.util.Log
 import com.decay.app.accessibility.DecayAccessibilityService
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -16,8 +17,14 @@ import kotlinx.coroutines.flow.StateFlow
  */
 object DecayCore {
 
+    private const val TAG = "DecayCore"
     private const val PREFS = "decay_prefs"
     private const val KEY_ENABLED = "enabled"
+    private const val KEY_LONG_BLINK = "long_blink_ms"
+
+    const val MIN_LONG_BLINK_MS = 400L
+    const val MAX_LONG_BLINK_MS = 1200L
+    const val DEFAULT_LONG_BLINK_MS = 700L
 
     @Volatile
     var accessibility: DecayAccessibilityService? = null
@@ -25,14 +32,18 @@ object DecayCore {
     private val _enabled = MutableStateFlow(false)
     val enabled: StateFlow<Boolean> = _enabled
 
+    /** Hold duration that triggers a scroll. Lower = looser/easier. */
+    val longBlinkMs = MutableStateFlow(DEFAULT_LONG_BLINK_MS)
+
     val foregroundPackage = MutableStateFlow<String?>(null)
     val detectionActive = MutableStateFlow(false)
     val eyeOpen = MutableStateFlow(1f)
     val lastGesture = MutableStateFlow<String?>(null)
     val scrollsToday = MutableStateFlow(0)
 
-    fun loadEnabled(ctx: Context) {
+    fun load(ctx: Context) {
         _enabled.value = prefs(ctx).getBoolean(KEY_ENABLED, false)
+        longBlinkMs.value = prefs(ctx).getLong(KEY_LONG_BLINK, DEFAULT_LONG_BLINK_MS)
     }
 
     fun setEnabled(ctx: Context, value: Boolean) {
@@ -42,9 +53,20 @@ object DecayCore {
         accessibility?.reevaluate()
     }
 
+    fun setLongBlinkMs(ctx: Context, value: Long) {
+        val clamped = value.coerceIn(MIN_LONG_BLINK_MS, MAX_LONG_BLINK_MS)
+        longBlinkMs.value = clamped
+        prefs(ctx).edit().putLong(KEY_LONG_BLINK, clamped).apply()
+    }
+
     /** Called by DetectionService when a deliberate long blink is recognized. */
     fun onLongBlink() {
-        val acc = accessibility ?: return
+        val acc = accessibility
+        if (acc == null) {
+            Log.w(TAG, "Long blink detected but accessibility service not connected")
+            return
+        }
+        Log.d(TAG, "LONG BLINK -> dispatching scroll")
         acc.performScrollNext()
         lastGesture.value = "Long blink → Next"
         scrollsToday.value = scrollsToday.value + 1

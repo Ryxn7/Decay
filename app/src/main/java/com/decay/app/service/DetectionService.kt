@@ -32,6 +32,7 @@ class DetectionService : LifecycleService() {
     private var analyzer: FaceAnalyzer? = null
     private lateinit var analysisExecutor: ExecutorService
     private val classifier = BlinkClassifier()
+    private var lastLogMs = 0L
 
     override fun onCreate() {
         super.onCreate()
@@ -84,8 +85,24 @@ class DetectionService : LifecycleService() {
 
     private fun onSignal(signal: FaceSignal) {
         DecayCore.eyeOpen.value = (signal.leftEyeOpen + signal.rightEyeOpen) / 2f
+        // Apply the user's current sensitivity live (cheap; runs on the analysis thread).
+        classifier.longBlinkMs = DecayCore.longBlinkMs.value
+
+        // Throttled diagnostic logging — read via: adb logcat -s DecayDetect
+        if (signal.timestampMs - lastLogMs >= 250L) {
+            lastLogMs = signal.timestampMs
+            Log.d(
+                "DecayDetect",
+                "face=${signal.faceFound} L=%.2f R=%.2f w=%.2f yaw=%.0f hold=${DecayCore.longBlinkMs.value}"
+                    .format(signal.leftEyeOpen, signal.rightEyeOpen, signal.faceWidthFraction, signal.yawDegrees)
+            )
+        }
+
         when (classifier.update(signal)) {
-            is BlinkEvent.LongBlink -> DecayCore.onLongBlink()
+            is BlinkEvent.LongBlink -> {
+                Log.d("DecayDetect", "*** LONG BLINK ***")
+                DecayCore.onLongBlink()
+            }
             else -> Unit
         }
     }
