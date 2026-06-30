@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Decay</string>
+    <string name="accessibility_description">Decay sends scroll gestures to apps like Instagram, TikTok and YouTube when it detects an intentional long blink. It only acts while one of your chosen apps is open. Camera frames are processed on-device and never leave your phone.</string>
+</resources>
